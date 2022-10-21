@@ -58,7 +58,7 @@ param gitOpsBootstrappingRepoBranch string = 'main'
 
 /*** VARIABLES ***/
 
-var subRgUniqueString = uniqueString('aks', subscription().subscriptionId, resourceGroup().id)
+var subRgUniqueString = uniqueString('aks', location, subscription().subscriptionId, resourceGroup().id)
 var clusterName = 'aks-${subRgUniqueString}'
 var agwName = 'apw-${clusterName}'
 
@@ -1657,6 +1657,7 @@ resource mc 'Microsoft.ContainerService/managedClusters@2022-03-02-preview' = {
   tags: {
     'Business unit': 'BU0001'
     'Application identifier': 'a0008'
+    AutoShutdownSchedule: 'Never'
   }
   properties: {
     kubernetesVersion: kubernetesVersion
@@ -1691,6 +1692,9 @@ resource mc 'Microsoft.ContainerService/managedClusters@2022-03-02-preview' = {
         nodeTaints: [
           'CriticalAddonsOnly=true:NoSchedule'
         ]
+        tags:{
+          AutoShutdownSchedule: 'Never'
+        }
       }
       {
         name: 'npuser01'
@@ -1717,6 +1721,9 @@ resource mc 'Microsoft.ContainerService/managedClusters@2022-03-02-preview' = {
         ]
         upgradeSettings: {
           maxSurge: '33%'
+        }
+        tags:{
+          AutoShutdownSchedule: 'Never'
         }
       }
     ]
@@ -2013,7 +2020,7 @@ resource mc_fluxConfiguration 'Microsoft.KubernetesConfiguration/fluxConfigurati
         dependsOn: []
         timeoutInSeconds: 300
         syncIntervalInSeconds: 300
-        retryIntervalInSeconds: 300
+        retryIntervalInSeconds: null
         prune: true
         force: false
       }

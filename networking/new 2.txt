@@ -1,0 +1,11 @@
+Before deploying spoke
+
+- Replace nextHopIpAddress to the first IP in the hub resource group
+
+After hub/spoke deployed
+
+- Create Public Load balancer
+
+- IP configuration uses hubs firewall subnet IP address (The first IP in the group)
+
+- backend pool points to IP address of the nodepool (only one by default)
