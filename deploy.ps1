@@ -72,6 +72,9 @@ if ($null -eq $RESOURCEID_VNET_HUB)
 Write-Host $RESOURCEID_VNET_HUB
 
 az deployment group create -g $SPOKE_RESOURCE_GROUP -f networking/spoke-BU0001A0008.bicep -p location=$PrimaryRegion hubVnetResourceId="$RESOURCEID_VNET_HUB" firewallSubnetIP="$firewallSubnetIP"
+
+$RESOURCEID_SUBNET_NODEPOOLS=$(az deployment group show -g $SPOKE_RESOURCE_GROUP -n spoke-BU0001A0008 --query properties.outputs.nodepoolSubnetResourceIds.value -o json)
+Write-Host RESOURCEID_SUBNET_NODEPOOLS: $RESOURCEID_SUBNET_NODEPOOLS
 az deployment group create -g $HUB_RESOURCE_GROUP -f networking/hub-regionA.bicep -p location=$PrimaryRegion
 
 # Bootstrapping

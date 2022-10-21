@@ -22,6 +22,10 @@ targetScope = 'resourceGroup'
 @description('The hub\'s regional affinity. All resources tied to this hub will also be homed in this region. The network team maintains this approved regional list which is a subset of zones with Availability Zone support.')
 param location string = 'eastus2'
 
+@description('Subnet resource IDs for all AKS clusters nodepools in all attached spokes to allow necessary outbound traffic through the firewall.')
+@minLength(1)
+param nodepoolSubnetResourceIds array
+
 @description('Optional. A /24 to contain the regional firewall, management, and gateway subnet. Defaults to 10.200.0.0/24')
 @maxLength(18)
 @minLength(10)
@@ -365,7 +369,7 @@ resource ipgNodepoolSubnet 'Microsoft.Network/ipGroups@2021-05-01' = {
   name: 'ipg-${location}-AksNodepools'
   location: location
   properties: {
-    ipAddresses: ['${reference('/subscriptions/b091e1a3-5af3-482d-b245-5734af84f707/resourceGroups/rgp-uks-ei-spoke-dev/providers/Microsoft.Network/virtualNetworks/vnet-spoke-BU0001A0008-00/subnets/snet-clusternodes', '2020-05-01').addressPrefix}']
+    ipAddresses: [for nodepoolSubnetResourceId in nodepoolSubnetResourceIds: '${reference(nodepoolSubnetResourceId, '2020-05-01').addressPrefix}']
   }
 }
 
