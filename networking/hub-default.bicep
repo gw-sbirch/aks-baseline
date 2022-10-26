@@ -365,7 +365,153 @@ resource pipAzureFirewall_diagnosticSetting 'Microsoft.Insights/diagnosticSettin
   }
 }]
 
+// Azure Firewall starter policy
+resource fwPolicy 'Microsoft.Network/firewallPolicies@2021-05-01' = {
+  name: 'fw-policies-${location}'
+  location: location
+  properties: {
+    sku: {
+      tier: 'Premium'
+    }
+    threatIntelMode: 'Deny'
+    insights: {
+      isEnabled: true
+      retentionDays: 30
+      logAnalyticsResources: {
+        defaultWorkspaceId: {
+          id: laHub.id
+        }
+      }
+    }
+    threatIntelWhitelist: {
+      fqdns: []
+      ipAddresses: []
+    }
+    intrusionDetection: {
+      mode: 'Deny'
+      configuration: {
+        bypassTrafficSettings: []
+        signatureOverrides: []
+      }
+    }
+    dnsSettings: {
+      servers: []
+      enableProxy: true
+    }
+  }
+
+  // Network hub starts out with only supporting DNS. This is only being done for
+  // simplicity in this deployment and is not guidance, please ensure all firewall
+  // rules are aligned with your security standards.
+  resource defaultNetworkRuleCollectionGroup 'ruleCollectionGroups@2021-05-01' = {
+    name: 'DefaultNetworkRuleCollectionGroup'
+    properties: {
+      priority: 200
+      ruleCollections: [
+        {
+          ruleCollectionType: 'FirewallPolicyFilterRuleCollection'
+          name: 'org-wide-allowed'
+          priority: 100
+          action: {
+            type: 'Allow'
+          }
+          rules: [
+            {
+              ruleType: 'NetworkRule'
+              name: 'DNS'
+              description: 'Allow DNS outbound (for simplicity, adjust as needed)'
+              ipProtocols: [
+                'UDP'
+              ]
+              sourceAddresses: [
+                '*'
+              ]
+              sourceIpGroups: []
+              destinationAddresses: [
+                '*'
+              ]
+              destinationIpGroups: []
+              destinationFqdns: []
+              destinationPorts: [
+                '53'
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+
+  // Network hub starts out with no allowances for appliction rules
+  resource defaultApplicationRuleCollectionGroup 'ruleCollectionGroups@2021-05-01' = {
+    name: 'DefaultApplicationRuleCollectionGroup'
+    dependsOn: [
+      defaultNetworkRuleCollectionGroup
+    ]
+    properties: {
+      priority: 300
+      ruleCollections: []
+    }
+  }
+}
+
+// This is the regional Azure Firewall that all regional spoke networks can egress through.
+resource hubFirewall 'Microsoft.Network/azureFirewalls@2021-05-01' = {
+  name: 'fw-${location}'
+  location: location
+  zones: [
+    '1'
+    '2'
+    '3'
+  ]
+  dependsOn: [
+    // This helps prevent multiple PUT updates happening to the firewall causing a CONFLICT race condition
+    // Ref: https://learn.microsoft.com/azure/firewall-manager/quick-firewall-policy
+    fwPolicy::defaultApplicationRuleCollectionGroup
+    fwPolicy::defaultNetworkRuleCollectionGroup
+  ]
+  properties: {
+    sku: {
+      tier: 'Premium'
+      name: 'AZFW_VNet'
+    }
+    firewallPolicy: {
+      id: fwPolicy.id
+    }
+    ipConfigurations: [for i in range(0, numFirewallIpAddressesToAssign): {
+      name: pipsAzureFirewall[i].name
+      properties: {
+        subnet: (0 == i) ? {
+          id: vnetHub::azureFirewallSubnet.id
+        } : null
+        publicIPAddress: {
+          id: pipsAzureFirewall[i].id
+        }
+      }
+    }]
+  }
+}
+
+resource hubFirewall_diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: 'default'
+  scope: hubFirewall
+  properties: {
+    workspaceId: laHub.id
+    logs: [
+      {
+        categoryGroup: 'allLogs'
+        enabled: true
+      }
+    ]
+    metrics: [
+      {
+        category: 'AllMetrics'
+        enabled: true
+      }
+    ]
+  }
+}
+
 /*** OUTPUTS ***/
 
 output hubVnetId string = vnetHub.id
-output firewallSubnetIP string = pipsAzureFirewall[0].properties.ipAddress

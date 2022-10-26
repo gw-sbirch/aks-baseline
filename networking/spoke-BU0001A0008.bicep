@@ -26,8 +26,6 @@ param hubVnetResourceId string
 @description('The spokes\'s regional affinity, must be the same as the hub\'s location. All resources tied to this spoke will also be homed in this region. The network team maintains this approved regional list which is a subset of zones with Availability Zone support.')
 param location string
 
-param firewallSubnetIP string
-
 // A designator that represents a business unit id and application id
 var orgAppId = 'BU0001A0008'
 var clusterVNetName = 'vnet-spoke-${orgAppId}-00'
@@ -43,6 +41,11 @@ resource hubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' existi
 resource hubVirtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' existing = {
   scope: hubResourceGroup
   name: '${last(split(hubVnetResourceId,'/'))}'
+}
+
+resource hubFirewall 'Microsoft.Network/azureFirewalls@2021-05-01' existing = {
+  scope: hubResourceGroup
+  name: 'fw-${location}'
 }
 
 // This is the networking log analytics workspace (in the hub)
@@ -64,7 +67,7 @@ resource routeNextHopToFirewall 'Microsoft.Network/routeTables@2021-05-01' = {
         properties: {
           nextHopType: 'VirtualAppliance'
           addressPrefix: '0.0.0.0/0'
-          nextHopIpAddress: firewallSubnetIP
+          nextHopIpAddress: hubFirewall.properties.ipConfigurations[0].properties.privateIPAddress
         }
       }
     ]
